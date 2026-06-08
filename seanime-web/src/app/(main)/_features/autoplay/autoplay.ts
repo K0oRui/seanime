@@ -158,36 +158,47 @@ export function useDebridstreamAutoplay() {
     const [nextEpisode, setNextEpisode] = useAtom(__autoplay_nextEpisodeAtom)
 
     const { handleAutoSelectStream, handleStreamSelection } = useHandleStartDebridStream()
-    const { autoPlayTorrent } = useAutoPlaySelectedTorrent()
+    const { autoPlayTorrent, setAutoPlayTorrent } = useAutoPlaySelectedTorrent()
 
     function handleAutoplayNextTorrentstreamEpisode() {
         if (!info) return
         const { entry, episodeNumber, aniDBEpisode, allEpisodes } = info
 
-        if (autoPlayTorrent?.torrent?.isBatch) {
+        // Get the torrent that was previously saved by autoplay
+        // If it's not for the same entry, ignore it
+        let torrentInfo = autoPlayTorrent
+        if (torrentInfo?.entry?.mediaId !== entry.mediaId) {
+            torrentInfo = null
+        }
+
+        if (torrentInfo?.torrent?.isBatch) {
 
             let fileIndex: number | undefined = undefined
-            if (autoPlayTorrent?.batchFiles) {
-                const file = autoPlayTorrent.batchFiles.files?.find(n => n.index === autoPlayTorrent.batchFiles!.current + 1)
+            if (torrentInfo?.batchFiles) {
+                const file = torrentInfo.batchFiles.files?.find(n => n.index === torrentInfo.batchFiles!.current + 1)
                 if (file) {
                     fileIndex = file.index
                 }
             }
+
+            const batchEpisodeFiles = (torrentInfo?.batchFiles && fileIndex !== undefined) ? {
+                ...torrentInfo.batchFiles,
+                current: fileIndex,
+                currentEpisodeNumber: episodeNumber,
+                currentAniDBEpisode: aniDBEpisode,
+            } : undefined
 
             // If the user provided a torrent, use it
             handleStreamSelection({
                 mediaId: entry.mediaId,
                 episodeNumber: episodeNumber,
                 aniDBEpisode: aniDBEpisode,
-                torrent: autoPlayTorrent.torrent,
+                torrent: torrentInfo.torrent,
                 chosenFileId: fileIndex !== undefined ? String(fileIndex) : "",
-                batchEpisodeFiles: (autoPlayTorrent?.batchFiles && fileIndex !== undefined) ? {
-                    ...autoPlayTorrent.batchFiles,
-                    current: fileIndex,
-                    currentEpisodeNumber: episodeNumber,
-                    currentAniDBEpisode: aniDBEpisode,
-                } : undefined,
+                batchEpisodeFiles,
             })
+
+            setAutoPlayTorrent(torrentInfo.torrent, entry, batchEpisodeFiles)
         } else {
             // Otherwise, use the auto-select function
             handleAutoSelectStream({ mediaId: entry.mediaId, episodeNumber: episodeNumber, aniDBEpisode })
